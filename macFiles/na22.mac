@@ -1,0 +1,17 @@
+/run/verbose 0
+/tracking/verbose 0
+
+/usrDefinedGeo/setCrystalType 2
+/usrDefinedGeo/setShieldingFlag 0
+/run/reinitializeGeometry
+
+/mydet/setUseCodeOrMacFile 1
+
+# For Na-22
+/gps/particle ion
+/gps/ion 11 22 0 0
+/gps/energy    0
+/gps/pos/type Point
+/gps/pos/centre 200. 200. -391.5 mm
+
+/run/beamOn 100

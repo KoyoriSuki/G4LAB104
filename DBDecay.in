@@ -1,0 +1,19 @@
+/control/verbose 2
+/run/verbose 1
+#
+/gun/particle ion
+/gun/ion 27 60
+#
+/DBDecay/fullChain false
+#
+/tracking/verbose 2
+/run/beamOn 1
+#
+/tracking/verbose 0
+/DBDecay/event/printModulo 10000
+#  
+/run/beamOn 100000
+#
+/DBDecay/fullChain true
+#  
+/run/beamOn 100000

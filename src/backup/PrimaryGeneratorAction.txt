@@ -1,0 +1,205 @@
+//
+// ********************************************************************
+// * License and Disclaimer                                           *
+// *                                                                  *
+// * The  Geant4 software  is  copyright of the Copyright Holders  of *
+// * the Geant4 Collaboration.  It is provided  under  the terms  and *
+// * conditions of the Geant4 Software License,  included in the file *
+// * LICENSE and available at  http://cern.ch/geant4/license .  These *
+// * include a list of copyright holders.                             *
+// *                                                                  *
+// * Neither the authors of this software system, nor their employing *
+// * institutes,nor the agencies providing financial support for this *
+// * work  make  any representation or  warranty, express or implied, *
+// * regarding  this  software system or assume any liability for its *
+// * use.  Please see the license in the file  LICENSE  and URL above *
+// * for the full disclaimer and the limitation of liability.         *
+// *                                                                  *
+// * This  code  implementation is the result of  the  scientific and *
+// * technical work of the GEANT4 collaboration.                      *
+// * By using,  copying,  modifying or  distributing the software (or *
+// * any work based  on the software)  you  agree  to acknowledge its *
+// * use  in  resulting  scientific  publications,  and indicate your *
+// * acceptance of all terms of the Geant4 Software license.          *
+// ********************************************************************
+//
+/// \file DBDecay/src/PrimaryGeneratorAction.cc
+/// \brief Implementation of the PrimaryGeneratorAction class
+//
+//
+// $Id: PrimaryGeneratorAction.cc 78307 2013-12-11 10:55:57Z gcosmo $
+// 
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+#include "PrimaryGeneratorAction.hh"
+
+#include "PrimaryGeneratorMessenger.hh"
+#include "G4Event.hh"
+#include "G4HEPEvtInterface.hh"
+#include "G4ParticleTable.hh"
+#include "G4IonTable.hh"
+#include "G4ParticleDefinition.hh"
+#include "G4Geantino.hh"
+#include "G4SystemOfUnits.hh"
+#include "Randomize.hh"
+#include <cmath>
+#include "globals.hh"
+#include "G4ios.hh"
+#include "G4Gamma.hh"
+#include "G4Box.hh"
+#include "G4Tubs.hh"
+#include "G4Orb.hh"
+#include "G4UnionSolid.hh"
+//#include "G4RotationMatrix"
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+PrimaryGeneratorAction::PrimaryGeneratorAction(DetectorConstruction* det)
+ : G4VUserPrimaryGeneratorAction(),
+   fGParticleSource(),
+   fDetector(det)
+{
+  //const char* filename = "pythia_event.data";
+  //HEPEvt = new G4HEPEvtInterface(filename);
+  //fGParticleSource  = new G4GeneralParticleSource();
+
+  //messenger = new PrimaryGeneratorMessenger(this);
+  //useHEPEvt = false;
+
+  ////
+  ////Energy Distribution Initialization
+  ////
+  //std::ifstream histFile("GammaFlux.txt");
+  //std::vector<double> histData;
+  //double freq;
+  //double totalFreq = 0.0;
+  //while (histFile >> freq) {
+  //    histData.push_back(freq);
+  //    totalFreq += freq;
+  //}
+  //std::transform(histData.begin(), histData.end(), histData.begin(),
+  //    [totalFreq](double freq1) { return freq1 / totalFreq; });
+  //EnergyDistribution = std::discrete_distribution<int>(histData.begin(), histData.end());
+  //generator.seed(std::random_device()());
+}
+
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+PrimaryGeneratorAction::~PrimaryGeneratorAction()
+{
+  delete HEPEvt;
+  delete fGParticleSource;
+  delete messenger;
+}
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+void PrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent)
+{
+  // set random particle  position
+  //  
+  G4double x0 = 1.*cm,   y0 = 1.*cm,   z0 = 1.*cm;
+  G4double dx0= 5.44*cm, dy0= 5.44*cm, dz0= 5.44*cm;
+  x0 = dx0*(G4UniformRand()-0.5);
+  y0 = dy0*(G4UniformRand()-0.5);
+  z0 = dz0*(G4UniformRand()-0.5);
+  HEPEvt->SetParticlePosition(G4ThreeVector(x0,y0,z0));
+//  HEPEvt->SetParticlePosition(G4ThreeVector(0,0,0));
+
+  // create vertex
+  //
+
+  int particleflag = 0;//0:gamma //1:ion
+  if(useHEPEvt)
+  { 
+      HEPEvt->GeneratePrimaryVertex(anEvent);
+  }
+  else if(particleflag == 0)
+  { 
+      //particle type
+      fGParticleSource->SetParticleDefinition(G4Gamma::GammaDefinition());
+
+      //kinetic energy
+      double EventEnergy = EnergyDistribution(generator) * 11.8336 * 0.001;
+      fGParticleSource->GetCurrentSource()->GetEneDist()->SetMonoEnergy(EventEnergy * MeV);
+
+      //source geometry
+      fGParticleSource->GetCurrentSource()->GetPosDist()->SetPosDisType("Surface");
+      fGParticleSource->GetCurrentSource()->GetPosDist()->SetPosDisShape("Sphere");
+      fGParticleSource->GetCurrentSource()->GetPosDist()->SetCentreCoords(G4ThreeVector(0.0 * cm, 0.0 * cm, -34 * mm));
+      fGParticleSource->GetCurrentSource()->GetPosDist()->SetRadius(15.0 * cm);
+
+      //direction
+      int dirFlag = 2; //0:cos 1:CMO 2:LMO
+      if (dirFlag == 0)
+      {
+          fGParticleSource->GetCurrentSource()->GetAngDist()->SetAngDistType("cos");
+      }
+      else if(dirFlag == 1)
+      {
+          G4double r = sqrt(G4UniformRand()) * 12.5 * mm;
+          G4double phi = G4UniformRand() * 3.14159 * 2;
+          G4double z = G4UniformRand() * 22.5 * mm * 2 - 22.5 * mm;
+          G4ThreeVector FocusedPoint(r * cos(phi), r * sin(phi), z - 391.5 * mm);
+          fGParticleSource->GetCurrentSource()->GetAngDist()->SetAngDistType("focused");
+          fGParticleSource->GetCurrentSource()->GetAngDist()->SetFocusPoint(FocusedPoint);
+      }
+      else if(dirFlag == 2)
+      {
+          G4double x = (2 * G4UniformRand() - 1) * 5.0 * mm;
+          G4double y = (2 * G4UniformRand() - 1) * 2.5 * mm;
+          G4double z = (2 * G4UniformRand() - 1) * 5.0 * mm;
+          G4ThreeVector FocusedPoint(x, y, z - 34 * mm);
+          fGParticleSource->GetCurrentSource()->GetAngDist()->SetAngDistType("focused");
+          fGParticleSource->GetCurrentSource()->GetAngDist()->SetFocusPoint(FocusedPoint);
+      }
+
+      //generate
+      fGParticleSource->GeneratePrimaryVertex(anEvent);
+  }
+  else if (particleflag == 1)
+  {
+      //particle type
+      fGParticleSource->SetParticleDefinition(G4IonTable::GetIonTable()->GetIon(82, 210, 0));
+
+      //kinetic energy
+      fGParticleSource->GetCurrentSource()->GetEneDist()->SetEnergyDisType("Mono");
+      fGParticleSource->GetCurrentSource()->GetEneDist()->SetMonoEnergy(0);
+
+      //source geometry
+      fGParticleSource->GetCurrentSource()->GetPosDist()->SetPosDisType("Point");
+        //lead shield
+      G4double halfinnerRadius = 400 * mm;
+      G4double halfouterRadius = 410 * mm;
+      G4double halfheight = 600 * mm;
+      G4double BottomThickness = 10 * mm;
+      //G4Tubs* solidCylinder =
+      //    new G4Tubs("Cylinder", halfinnerRadius, halfouterRadius, halfheight, 0, CLHEP::twopi);
+      //G4Tubs* solidDisk =
+      //    new G4Tubs("Bottom", 0, halfouterRadius, halfBottomThickness, 0, CLHEP::twopi);
+      //G4ThreeVector diskPosition(0., 0., -(halfheight + halfBottomThickness) * mm);
+      //G4UnionSolid* solidLeadShield = new G4UnionSolid("LeadShield", solidCylinder, solidDisk, nullptr, diskPosition);
+      //G4ThreeVector sourcePoint = solidLeadShield->GetPointOnSurface();
+      G4double x11, y11, z11;
+      do {
+          x11 = ((G4UniformRand() * halfouterRadius) * 2 - halfouterRadius);
+          y11 = ((G4UniformRand() * halfouterRadius) * 2 - halfouterRadius);
+          z11 = ((G4UniformRand() * (halfheight + BottomThickness)) * 2 - (halfheight + BottomThickness));
+      } while (fabs(x11) < halfinnerRadius && fabs(y11) < halfinnerRadius && z11 > - halfheight);
+
+      G4ThreeVector sourcePoint = *(new G4ThreeVector(x11, y11, z11));
+
+      G4ThreeVector leadShieldPosition(0.0 * cm, 0.0 * cm, -889 * mm + 700 * mm);
+      fGParticleSource->GetCurrentSource()->GetPosDist()->SetCentreCoords(sourcePoint + leadShieldPosition);
+
+      //particle direction
+      fGParticleSource->GetCurrentSource()->GetAngDist()->SetAngDistType("iso");
+
+      //generate
+      fGParticleSource->GeneratePrimaryVertex(anEvent);
+  }
+//     G4cout<<fGParticleSource->GetParticlePosition()<<G4endl;}
+
+   
+}
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......

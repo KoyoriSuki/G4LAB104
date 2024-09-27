@@ -1,0 +1,806 @@
+//
+// ********************************************************************
+// * License and Disclaimer                                           *
+// *                                                                  *
+// * The  Geant4 software  is  copyright of the Copyright Holders  of *
+// * the Geant4 Collaboration.  It is provided  under  the terms  and *
+// * conditions of the Geant4 Software License,  included in the file *
+// * LICENSE and available at  http://cern.ch/geant4/license .  These *
+// * include a list of copyright holders.                             *
+// *                                                                  *
+// * Neither the authors of this software system, nor their employing *
+// * institutes,nor the agencies providing financial support for this *
+// * work  make  any representation or  warranty, express or implied, *
+// * regarding  this  software system or assume any liability for its *
+// * use.  Please see the license in the file  LICENSE  and URL above *
+// * for the full disclaimer and the limitation of liability.         *
+// *                                                                  *
+// * This  code  implementation is the result of  the  scientific and *
+// * technical work of the GEANT4 collaboration.                      *
+// * By using,  copying,  modifying or  distributing the software (or *
+// * any work based  on the software)  you  agree  to acknowledge its *
+// * use  in  resulting  scientific  publications,  and indicate your *
+// * acceptance of all terms of the Geant4 Software license.          *
+// ********************************************************************
+//
+/// \file radioactivedecay/rdecay01/src/DetectorConstruction.cc
+/// \brief Implementation of the DetectorConstruction class
+//
+//
+// $Id: DetectorConstruction.cc 78307 2013-12-11 10:55:57Z gcosmo $
+// 
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+#include "DetectorConstruction.hh"
+#include "SteppingAction.hh"
+
+#include "G4NistManager.hh"
+#include "G4Box.hh"
+#include "G4Orb.hh"
+#include "G4Tubs.hh"
+#include "G4LogicalVolume.hh"
+#include "G4PVPlacement.hh"
+#include "G4SystemOfUnits.hh"
+#include "G4GlobalMagFieldMessenger.hh"
+#include "G4UserLimits.hh"
+
+#include "G4Colour.hh"
+#include "G4VisAttributes.hh"
+#include "G4AutoDelete.hh"
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+G4ThreadLocal G4GlobalMagFieldMessenger* DetectorConstruction::fMagFieldMessenger = 0;
+
+DetectorConstruction::DetectorConstruction()
+: G4VUserDetectorConstruction()
+{G4cout<<"<<------------DetectorConstruction::DetectorConstruction()-------------------->>"<<G4endl;}
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+DetectorConstruction::~DetectorConstruction()
+{G4cout<<"<<------------DetectorConstruction::~DetectorConstruction()-------------------->>"<<G4endl;}
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+G4VPhysicalVolume* DetectorConstruction::Construct()
+{
+	G4cout<<"<<------------DetectorConstruction::Construct()-------------------->>"<<G4endl;
+	//
+	// World volume
+	//   
+
+	// Material ---> Vacuum  
+	G4Material* Vacuum = G4NistManager::Instance()->FindOrBuildMaterial("G4_Galactic");
+	G4Material* Al = G4NistManager::Instance()->FindOrBuildMaterial("G4_Al");
+	G4Material* Cu = G4NistManager::Instance()->FindOrBuildMaterial("G4_Cu");  
+	G4Material* Ge = G4NistManager::Instance()->FindOrBuildMaterial("G4_Ge"); 
+	G4Material* Air = G4NistManager::Instance()->FindOrBuildMaterial("G4_AIR");
+	//Material --->CO2
+	G4Material* CO2 = G4NistManager::Instance()->FindOrBuildMaterial("G4_CARBON_DIOXIDE");
+	//Material --->Ar
+	G4Material* Ar = G4NistManager::Instance()->FindOrBuildMaterial("G4_Ar");
+	//Material --->Ne
+	G4Material* Ne = G4NistManager::Instance()->FindOrBuildMaterial("G4_Ne");
+	G4Material* Xe = G4NistManager::Instance()->FindOrBuildMaterial("G4_Xe");
+
+	//Materials defined by self
+	G4String symbol;
+	G4double a;                                              // atomic mass
+	G4double z;                                              // atomic number
+	G4double density;
+	G4int ncomponents, natoms;
+	G4Element* C  = new G4Element("Carbon",     symbol= "C",  z= 6.,  a= 12.00*g/mole);
+	G4Element* H  = new G4Element("Hydrogen",   symbol= "H",  z= 1.,  a= 1.00*g/mole);
+	G4Element* O  = new G4Element("Oxygen",     symbol= "O" , z= 8. , a= 16.00*g/mole);
+	G4Element* Si = new G4Element("Si",			symbol= "Si", z= 14., a= 28.00*g/mole);
+	//Material--->PET C10H8O4
+	G4Material* PET = new G4Material("PET", density=1.38*g/cm3, ncomponents=3); //PET 200um
+	PET->AddElement(C, natoms=10);
+	PET->AddElement(H, natoms=8);
+	PET->AddElement(O, natoms=4);
+
+	//Define FR4, from https://agenda.infn.it/event/14179/contributions/23405/attachments/16712/18966/Geant_FR4_Raffaella_v1.pdf
+	//epoxy
+	G4Material* Epoxy = new G4Material("Epoxy", density = 1.2*g/cm3, ncomponents = 2);
+	Epoxy->AddElement(H, natoms = 2);
+	Epoxy->AddElement(C, natoms = 2);
+	//SiO2
+	G4Material* SiO2 = new G4Material("SiO2", density = 2.200*g/cm3, ncomponents = 2);
+	SiO2->AddElement(Si, natoms = 1);
+	SiO2->AddElement(O, natoms = 2);
+	//Material--->FR4
+	G4Material* FR4 = new G4Material("FR4", density = 1.86*g/cm3, ncomponents = 2);
+	FR4->AddMaterial(Epoxy, 47.2*perCent);
+	FR4->AddMaterial(SiO2, 52.8*perCent);
+
+	G4Material* Polyacrylate = new G4Material("Polyacrylate", density=1.39*g/cm3, ncomponents=3); //PET 200um
+	Polyacrylate->AddElement(C, natoms=3);
+	Polyacrylate->AddElement(H, natoms=4);
+	Polyacrylate->AddElement(O, natoms=2);
+	//Material ---> Atlasgas
+	G4Material* Atlasgas = new G4Material("Atlasgas", density=1.79e-3*g/cm3, ncomponents=2);   //atlas gas 10mm
+	Atlasgas->AddMaterial(CO2, 7.0*perCent);
+	Atlasgas->AddMaterial(Ar,  93.0*perCent);
+
+	//Material ---> C4H10
+	G4Material* iC4H10 = new G4Material("iC4H10",  density=2.487e-3*g/cm3, ncomponents=2);  
+	//density should be checked!!!
+	iC4H10->AddElement(C, natoms=4);
+	iC4H10->AddElement(H, natoms=10);
+
+	//Material ---> Ne+C4H10
+	G4Material* NeiC4H10 = new G4Material("NeiC4H10", density=0.98e-3*g/cm3, ncomponents=2);   
+	NeiC4H10->AddMaterial(iC4H10,  5.0*perCent);
+	NeiC4H10->AddMaterial(Ne,     95.0*perCent);
+
+	//Material ---> Ar+iC4H10				//density is calculated by volume fraction 96.5/3.5
+	G4Material* AriC4H10 = new G4Material("AriC4H10", density = (0.001782 * 0.965 + 0.00251 * 0.035)*g/cm3, ncomponents = 2);
+	AriC4H10->AddMaterial(iC4H10, 	3.5*perCent);
+	AriC4H10->AddMaterial(Ar,	  	96.5*perCent);
+
+	//---------------construct detector---------------
+	// Full sphere shape
+	G4double solidWorld_rmax = 100*cm;
+	G4Orb* solidWorld = new G4Orb(
+			"World",                   // its name
+			solidWorld_rmax);                 // its size 
+
+	G4LogicalVolume* logicWorld = new G4LogicalVolume(
+			solidWorld,             // its solid
+			Air,                 // its material
+			"World");               // its name
+	G4VPhysicalVolume* physicalWorld = new G4PVPlacement(
+			0,                        // no rotation
+			G4ThreeVector(),          // at (0,0,0)
+			logicWorld,               // its logical volume
+			"World",                  // its name
+			0,                        // its mother  volume
+			false,                    // no boolean operation
+			0);                       // copy number
+
+
+	//common parameters of the aluminum frame
+	G4double FrameSizeX = 20.6*cm;
+	G4double FrameSizeY = 20.6*cm;
+	G4double InnerFrameSizeX = 18.4*cm;
+	G4double InnerFrameSizeY = 18.4*cm;
+	G4double FrameStepHeight = 0.2*cm;
+	G4double WindowSizeX = 14.2*cm;
+	G4double WindowSizeY = 14.2*cm;
+
+	// parameters of PET
+	G4double petsizeX = InnerFrameSizeX;
+	G4double petsizeY = InnerFrameSizeY;
+	G4double petsizeZ = (167e-4)*cm;
+
+	// Double-sided adhesive
+	// parameters of Polyacrylate
+	G4double polysizeX = InnerFrameSizeX;
+	G4double polysizeY = InnerFrameSizeY;
+	G4double polysizeZ = (2e-4)*cm;
+
+	// parameters of TPC
+	G4double TPCSizeZ = 6.7*cm;	
+	G4double TPCGasThickness = TPCSizeZ-FrameStepHeight-polysizeZ-2*petsizeZ;
+	G4double EffectiveSizeX = 12.*cm;
+	G4double EffectiveSizeY = 12.*cm;
+
+	// parameters of the micromegas
+	G4double MMSizeZ = 1.2*cm;
+	G4double MMGasThickness = MMSizeZ-FrameStepHeight-polysizeZ-2*petsizeZ;
+	G4double MMEffectiveSizeX = 15.*cm;
+	G4double MMEffectiveSizeY = 15.*cm;
+
+	// parameters of the PCB board
+	G4double PCBsizeX = 27*cm;
+	G4double PCBsizeY = 28*cm;
+	G4double PCBdeltaY = 0.5*cm;
+	G4double PCBthickness = 0.273*cm;
+
+	// parameters of Cu board
+	G4double CusizeX = PCBsizeX;
+	G4double CusizeY = PCBsizeY;
+	G4double CudeltaY = PCBdeltaY;
+	G4double Cuthickness = 10e-4*cm;
+
+
+	
+/*
+*/
+//=============PART1: The TPC detector=========
+
+	// Gas chamber
+	G4ThreeVector positionTPC = G4ThreeVector(0., 0., -0.5*TPCSizeZ);		//(0,0,-3.35)cm center, top at z=0
+
+	G4Box* solidframe = new G4Box("AlFrame",                                    // its name
+			0.5*FrameSizeX, 0.5*FrameSizeY, 0.5*TPCSizeZ);                      // its size
+
+	G4LogicalVolume* logicframe = new G4LogicalVolume(
+			solidframe,                                    // its solid
+			Al,                                    // its material
+			"AlFrame");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionTPC,                                 // at (0,0,0)
+			logicframe,                                    // its logical volume
+			"AlFrame",                                       // its name
+			logicWorld,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+	G4ThreeVector positionStep = G4ThreeVector(0., 0., -0.5*FrameStepHeight);		
+	
+	G4Box* solidstep = new G4Box("Step",
+			0.5*WindowSizeX, 0.5*WindowSizeY, 0.5*FrameStepHeight);
+
+	G4LogicalVolume* logicstep = new G4LogicalVolume(
+			solidstep,                                    // its solid
+			Air,                                    // its material
+			"Step");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionStep-positionTPC,                                 // at (0,0,0)
+			logicstep,                                    // its logical volume
+			"Step",                                       // its name
+			logicframe,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+	G4ThreeVector positionPET = G4ThreeVector(0., 0., -FrameStepHeight-0.5*petsizeZ);
+
+	G4Box* solidPET = new G4Box("PET",                                    // its name
+			0.5*petsizeX, 0.5*petsizeY, 0.5*petsizeZ);                      // its size
+
+
+	G4LogicalVolume* logicPET = new G4LogicalVolume(
+			solidPET,                                     // its solid
+			PET,                                          // its material
+			"PET");                                       // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionPET-positionTPC,                                 // at (0,0,0)
+			logicPET,                                    // its logical volume
+			"PET",                                       // its name
+			logicframe,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+	G4ThreeVector positionPoly = G4ThreeVector(0., 0., -FrameStepHeight-petsizeZ-0.5*polysizeZ);
+
+	G4Box* solidPoly = new G4Box("Poly",                                    // its name
+			0.5*polysizeX, 0.5*polysizeY, 0.5*polysizeZ);                      // its size
+
+
+	G4LogicalVolume* logicPoly = new G4LogicalVolume(
+			solidPoly,                                     // its solid
+			Polyacrylate,                                          // its material
+			"Poly");                                       // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionPoly-positionTPC,                                 // at (0,0,0)
+			logicPoly,                                    // its logical volume
+			"Poly",                                       // its name
+			logicframe,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+	// PET 2 sandwich
+
+
+	G4ThreeVector positionPET2 = G4ThreeVector(0., 0., -FrameStepHeight-petsizeZ-polysizeZ-0.5*petsizeZ);
+
+	G4Box* solidPET2 = new G4Box("PET2",                                    // its name
+			0.5*petsizeX, 0.5*petsizeY, 0.5*petsizeZ);                      // its size
+
+
+	G4LogicalVolume* logicPET2 = new G4LogicalVolume(
+			solidPET2,                                     // its solid
+			PET,                                          // its material
+			"PET2");                                       // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionPET2-positionTPC,                                 // at (0,0,0)
+			logicPET2,                                    // its logical volume
+			"PET",                                       // its name
+			logicframe,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+	G4ThreeVector positionGas = G4ThreeVector(0., 0., -FrameStepHeight-petsizeZ-polysizeZ-petsizeZ-0.5*TPCGasThickness);
+
+	G4Box* solidGas = new G4Box("Gas",                                    // its name
+			0.5*InnerFrameSizeX, 0.5*InnerFrameSizeY, 0.5*TPCGasThickness);                      // its size
+
+	G4LogicalVolume* logicGas = new G4LogicalVolume(
+			solidGas,                                    // its solid
+			AriC4H10,                                    // its material
+			"Gas");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionGas-positionTPC,                                 // at (0,0,0)
+			logicGas,                                    // its logical volume
+			"Gas",                                       // its name
+			logicframe,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+	G4Box* solidGasEff = new G4Box("GasEff",                                    // its name
+			0.5*EffectiveSizeX, 0.5*EffectiveSizeY, 0.5*TPCGasThickness);                      // its size
+
+	G4LogicalVolume* logicGasEff = new G4LogicalVolume(
+			solidGasEff,                                    // its solid
+			AriC4H10,                                    // its material
+			"GasEff");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			G4ThreeVector(),                                 // at (0,0,0)
+			logicGasEff,                                    // its logical volume
+			"GasEff",                                       // its name
+			logicGas,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+	//	PCB board
+
+	G4ThreeVector positionPCB = G4ThreeVector(0., PCBdeltaY, -TPCSizeZ-0.5*PCBthickness);				//at (0,0,-6.8365)		
+	G4Box* solidPCB = new G4Box("PCB",                                    // its name
+			0.5*PCBsizeX, 0.5*PCBsizeY, 0.5*PCBthickness);                      // its size
+
+	G4LogicalVolume* logicPCB = new G4LogicalVolume(
+			solidPCB,                                    // its solid
+			FR4,                                    // its material
+			"PCB");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionPCB,                                 // at (0,0,0)
+			logicPCB,                                    // its logical volume
+			"PCB",                                       // its name
+			logicWorld,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+	//	Copper board
+
+	G4ThreeVector positionCubrd = G4ThreeVector(0., CudeltaY, -TPCSizeZ-PCBthickness-0.5*Cuthickness);	
+
+	G4Box* solidCubrd = new G4Box("Cu_board",                                    // its name
+			0.5*CusizeX, 0.5*CusizeY, 0.5*Cuthickness);                      // its size
+
+	G4LogicalVolume* logicCubrd = new G4LogicalVolume(
+			solidCubrd,                                    // its solid
+			Cu,                                    // its material
+			"Cu_board");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionCubrd,                                 // at (0,0,0)
+			logicCubrd,                                    // its logical volume
+			"Cu_board",                                       // its name
+			logicWorld,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+	G4ThreeVector positionBackFrame = G4ThreeVector(0., 0., -TPCSizeZ-PCBthickness-Cuthickness-0.5*MMSizeZ);
+
+	G4Box* solidbackframe = new G4Box("backframe",                                    // its name
+			0.5*FrameSizeX, 0.5*FrameSizeY, 0.5*MMSizeZ);                      // its size
+
+	G4LogicalVolume* logicbackframe = new G4LogicalVolume(
+			solidbackframe,                                    // its solid
+			Al,                                    // its material
+			"backframe");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionBackFrame,                                 // at (0,0,0)
+			logicbackframe,                                    // its logical volume
+			"backframe",                                       // its name
+			logicWorld,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+	G4ThreeVector positionBackStep = G4ThreeVector(0., 0., -TPCSizeZ-PCBthickness-Cuthickness-MMSizeZ+0.5*FrameStepHeight);		
+	
+	G4Box* solidbackstep = new G4Box("BackStep",
+			0.5*WindowSizeX, 0.5*WindowSizeY, 0.5*FrameStepHeight);
+
+	G4LogicalVolume* logicbackstep = new G4LogicalVolume(
+			solidbackstep,                                    // its solid
+			Air,                                    // its material
+			"BackStep");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionBackStep-positionBackFrame,                                 // at (0,0,0)
+			logicbackstep,                                    // its logical volume
+			"BackStep",                                       // its name
+			logicbackframe,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+	G4ThreeVector positionBackHollow = G4ThreeVector(0., 0., -TPCSizeZ-PCBthickness-Cuthickness-0.5*(MMSizeZ-FrameStepHeight));		
+	
+	G4Box* solidbackhollow = new G4Box("BackHollow",
+			0.5*InnerFrameSizeX, 0.5*InnerFrameSizeY, 0.5*(MMSizeZ-FrameStepHeight));
+
+	G4LogicalVolume* logicbackhollow = new G4LogicalVolume(
+			solidbackhollow,                                    // its solid
+			Air,                                    // its material
+			"BackHollow");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionBackHollow-positionBackFrame,                                 // at (0,0,0)
+			logicbackhollow,                                    // its logical volume
+			"BackHollow",                                       // its name
+			logicbackframe,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+// ==========================================================
+
+//================PART2: central frame for segmentation=====================
+
+	G4ThreeVector positionCentralFrame = G4ThreeVector(0., 0., 0.5*MMSizeZ);
+
+	G4Box* solidcentralframe = new G4Box("centralframe",                                    // its name
+			0.5*FrameSizeX, 0.5*FrameSizeY, 0.5*MMSizeZ);                      // its size
+
+	G4LogicalVolume* logiccentralframe = new G4LogicalVolume(
+			solidcentralframe,                                    // its solid
+			Al,                                    // its material
+			"centralframe");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionCentralFrame,                                 // at (0,0,0)
+			logiccentralframe,                                    // its logical volume
+			"centralframe",                                       // its name
+			logicWorld,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+	G4ThreeVector positionCentralStep = G4ThreeVector(0., 0., 0.5*FrameStepHeight);		
+	
+	G4Box* solidcentralstep = new G4Box("CentralStep",
+			0.5*WindowSizeX, 0.5*WindowSizeY, 0.5*FrameStepHeight);
+
+	G4LogicalVolume* logiccentralstep = new G4LogicalVolume(
+			solidcentralstep,                                    // its solid
+			Air,                                    // its material
+			"CentralStep");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionCentralStep-positionCentralFrame,                                 // at (0,0,0)
+			logiccentralstep,                                    // its logical volume
+			"CentralStep",                                       // its name
+			logiccentralframe,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+	G4ThreeVector positionCentralHollow = G4ThreeVector(0., 0., FrameStepHeight+0.5*(MMSizeZ-FrameStepHeight));		
+	
+	G4Box* solidcentralhollow = new G4Box("CentralHollow",
+			0.5*InnerFrameSizeX, 0.5*InnerFrameSizeY, 0.5*(MMSizeZ-FrameStepHeight));
+
+	G4LogicalVolume* logiccentralhollow = new G4LogicalVolume(
+			solidcentralhollow,                                    // its solid
+			Air,                                    // its material
+			"CentralHollow");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionCentralHollow-positionCentralFrame,                                 // at (0,0,0)
+			logiccentralhollow,                                    // its logical volume
+			"CentralHollow",                                       // its name
+			logiccentralframe,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+// =====================================================================
+
+//================PART3: MicroMegas detector=====================
+
+	// MM detector
+	G4ThreeVector positionMM = G4ThreeVector(0., 0., MMSizeZ+0.5*MMSizeZ);		//(0,0,-3.35)cm center, top at z=0
+
+	G4Box* solidframe2 = new G4Box("AlFrame2",                                    // its name
+			0.5*FrameSizeX, 0.5*FrameSizeY, 0.5*MMSizeZ);                      // its size
+
+	G4LogicalVolume* logicframe2 = new G4LogicalVolume(
+			solidframe2,                                    // its solid
+			Al,                                    // its material
+			"AlFrame2");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionMM,                                 // at (0,0,0)
+			logicframe2,                                    // its logical volume
+			"AlFrame2",                                       // its name
+			logicWorld,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+	G4ThreeVector positionStep2 = G4ThreeVector(0., 0., MMSizeZ+0.5*FrameStepHeight);		
+	
+	G4Box* solidstep2 = new G4Box("Step2",
+			0.5*WindowSizeX, 0.5*WindowSizeY, 0.5*FrameStepHeight);
+
+	G4LogicalVolume* logicstep2 = new G4LogicalVolume(
+			solidstep2,                                    // its solid
+			Air,                                    // its material
+			"Step2");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionStep2-positionMM,                                 // at (0,0,0)
+			logicstep2,                                    // its logical volume
+			"Step2",                                       // its name
+			logicframe2,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+	G4ThreeVector positionPET3 = G4ThreeVector(0., 0., MMSizeZ+FrameStepHeight+0.5*petsizeZ);
+
+	G4Box* solidPET3 = new G4Box("PET3",                                    // its name
+			0.5*petsizeX, 0.5*petsizeY, 0.5*petsizeZ);                      // its size
+
+
+	G4LogicalVolume* logicPET3 = new G4LogicalVolume(
+			solidPET3,                                     // its solid
+			PET,                                          // its material
+			"PET3");                                       // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionPET3-positionMM,                                 // at (0,0,0)
+			logicPET3,                                    // its logical volume
+			"PET3",                                       // its name
+			logicframe2,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+	G4ThreeVector positionPoly2 = G4ThreeVector(0., 0., MMSizeZ+FrameStepHeight+petsizeZ+0.5*polysizeZ);
+
+	G4Box* solidPoly2 = new G4Box("Poly2",                                    // its name
+			0.5*polysizeX, 0.5*polysizeY, 0.5*polysizeZ);                      // its size
+
+
+	G4LogicalVolume* logicPoly2 = new G4LogicalVolume(
+			solidPoly2,                                     // its solid
+			Polyacrylate,                                          // its material
+			"Poly2");                                       // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionPoly2-positionMM,                                 // at (0,0,0)
+			logicPoly2,                                    // its logical volume
+			"Poly2",                                       // its name
+			logicframe2,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+	// PET 2 sandwich
+
+
+	G4ThreeVector positionPET4 = G4ThreeVector(0., 0., MMSizeZ+FrameStepHeight+petsizeZ+polysizeZ+0.5*petsizeZ);
+
+	G4Box* solidPET4 = new G4Box("PET4",                                    // its name
+			0.5*petsizeX, 0.5*petsizeY, 0.5*petsizeZ);                      // its size
+
+
+	G4LogicalVolume* logicPET4 = new G4LogicalVolume(
+			solidPET4,                                     // its solid
+			PET,                                          // its material
+			"PET4");                                       // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionPET4-positionMM,                                 // at (0,0,0)
+			logicPET4,                                    // its logical volume
+			"PET4",                                       // its name
+			logicframe2,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+	G4ThreeVector positionGas2 = G4ThreeVector(0., 0., MMSizeZ+MMSizeZ-0.5*MMGasThickness);
+
+	G4Box* solidGas2 = new G4Box("Gas2",                                    // its name
+			0.5*InnerFrameSizeX, 0.5*InnerFrameSizeY, 0.5*MMGasThickness);                      // its size
+
+	G4LogicalVolume* logicGas2 = new G4LogicalVolume(
+			solidGas2,                                    // its solid
+			AriC4H10,                                    // its material
+			"Gas2");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionGas2-positionMM,                                 // at (0,0,0)
+			logicGas2,                                    // its logical volume
+			"Gas2",                                       // its name
+			logicframe2,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+	G4Box* solidGasEff2 = new G4Box("GasEff2",                                    // its name
+			0.5*MMEffectiveSizeX, 0.5*MMEffectiveSizeY, 0.5*MMGasThickness);                      // its size
+
+	G4LogicalVolume* logicGasEff2 = new G4LogicalVolume(
+			solidGasEff2,                                    // its solid
+			AriC4H10,                                    // its material
+			"GasEff2");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			G4ThreeVector(),                                 // at (0,0,0)
+			logicGasEff2,                                    // its logical volume
+			"GasEff2",                                       // its name
+			logicGas2,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+	//	PCB board
+
+	G4ThreeVector positionPCB2 = G4ThreeVector(0., PCBdeltaY, MMSizeZ+MMSizeZ+0.5*PCBthickness);		//at (0,0,2.5365)	
+	G4Box* solidPCB2 = new G4Box("PCB2",                                    // its name
+			0.5*PCBsizeX, 0.5*PCBsizeY, 0.5*PCBthickness);                      // its size
+
+	G4LogicalVolume* logicPCB2 = new G4LogicalVolume(
+			solidPCB2,                                    // its solid
+			FR4,                                    // its material
+			"PCB2");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionPCB2,                                 // at (0,0,0)
+			logicPCB2,                                    // its logical volume
+			"PCB2",                                       // its name
+			logicWorld,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+	//	Copper board
+
+	G4ThreeVector positionCubrd2 = G4ThreeVector(0., CudeltaY, MMSizeZ+MMSizeZ+PCBthickness+0.5*Cuthickness);	
+
+	G4Box* solidCubrd2 = new G4Box("Cu_board2",                                    // its name
+			0.5*CusizeX, 0.5*CusizeY, 0.5*Cuthickness);                      // its size
+
+	G4LogicalVolume* logicCubrd2 = new G4LogicalVolume(
+			solidCubrd2,                                    // its solid
+			Cu,                                    // its material
+			"Cu_board2");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionCubrd2,                                 // at (0,0,0)
+			logicCubrd2,                                    // its logical volume
+			"Cu_board2",                                       // its name
+			logicWorld,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+	G4ThreeVector positionBackFrame2 = G4ThreeVector(0., 0., MMSizeZ+MMSizeZ+PCBthickness+Cuthickness+0.5*MMSizeZ);
+
+	G4Box* solidbackframe2 = new G4Box("backframe2",                                    // its name
+			0.5*FrameSizeX, 0.5*FrameSizeY, 0.5*MMSizeZ);                      // its size
+
+	G4LogicalVolume* logicbackframe2 = new G4LogicalVolume(
+			solidbackframe2,                                    // its solid
+			Al,                                    // its material
+			"backframe2");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionBackFrame2,                                 // at (0,0,0)
+			logicbackframe2,                                    // its logical volume
+			"backframe2",                                       // its name
+			logicWorld,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+	G4ThreeVector positionBackStep2 = G4ThreeVector(0., 0., MMSizeZ+MMSizeZ+PCBthickness+Cuthickness+MMSizeZ-0.5*FrameStepHeight);		
+	
+	G4Box* solidbackstep2 = new G4Box("BackStep2",
+			0.5*WindowSizeX, 0.5*WindowSizeY, 0.5*FrameStepHeight);
+
+	G4LogicalVolume* logicbackstep2 = new G4LogicalVolume(
+			solidbackstep2,                                    // its solid
+			Air,                                    // its material
+			"BackStep2");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionBackStep2-positionBackFrame2,                                 // at (0,0,0)
+			logicbackstep2,                                    // its logical volume
+			"BackStep2",                                       // its name
+			logicbackframe2,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+	G4ThreeVector positionBackHollow2 = G4ThreeVector(0., 0., MMSizeZ+MMSizeZ+PCBthickness+Cuthickness+0.5*(MMSizeZ-FrameStepHeight));		
+	
+	G4Box* solidbackhollow2 = new G4Box("BackHollow2",
+			0.5*InnerFrameSizeX, 0.5*InnerFrameSizeY, 0.5*(MMSizeZ-FrameStepHeight));
+
+	G4LogicalVolume* logicbackhollow2 = new G4LogicalVolume(
+			solidbackhollow2,                                    // its solid
+			Air,                                    // its material
+			"BackHollow2");                                      // its name
+
+	new G4PVPlacement(
+			0,                                           // no rotation
+			positionBackHollow2-positionBackFrame2,                                 // at (0,0,0)
+			logicbackhollow2,                                    // its logical volume
+			"BackHollow2",                                       // its name
+			logicbackframe2,                                  // its mother  volume
+			false,                                       // no boolean operation
+			0);                                          // copy number
+
+
+// ===============================================================
+
+
+	//-----Set the step limits in the Gas volume-------------
+	G4double maxStep = 1.0*mm;
+	fStepLimits = new G4UserLimits(maxStep);
+	logicGasEff->SetUserLimits(fStepLimits);
+	//-------------------------------
+
+
+
+	G4VisAttributes* visAttributes = new G4VisAttributes(G4Colour(0.9,0.0,0.0));
+	visAttributes->SetVisibility(false);
+	logicWorld->SetVisAttributes(visAttributes);
+
+	// visAttributes = new G4VisAttributes(G4Colour(0.0,0.0,1.0)); // red
+	// logicCollimation->SetVisAttributes(visAttributes);
+
+	visAttributes = new G4VisAttributes(G4Colour(1.0,0.0,1.0)); 
+	logicGas->SetVisAttributes(visAttributes);
+	visAttributes = new G4VisAttributes(G4Colour(0.0,1.0,0.0)); 
+	logicGasEff->SetVisAttributes(visAttributes);
+	visAttributes = new G4VisAttributes(G4Colour(1.0,0.0,1.0)); 
+	logicGasEff2->SetVisAttributes(visAttributes);
+
+
+	//
+	//always return the physical World
+	//  
+	return physicalWorld;
+}
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+void DetectorConstruction::ConstructSDandField(){
+	// Create global magnetic field messenger.
+  	// Uniform magnetic field is then created automatically if
+  	// the field value is not zero.
+  	G4ThreeVector fieldValue = G4ThreeVector();
+  	fMagFieldMessenger = new G4GlobalMagFieldMessenger(fieldValue);
+  	fMagFieldMessenger->SetVerboseLevel(1);
+	
+  	// Register the field messenger for deleting
+  	G4AutoDelete::Register(fMagFieldMessenger);
+}
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
